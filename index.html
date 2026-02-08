@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Blender Bolt Generator Pro</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Fira+Code:wght@400;500&display=swap');
+        body { font-family: 'Inter', sans-serif; margin: 0; padding: 0; overflow: hidden; background-color: #0f172a; }
+        code, pre { font-family: 'Fira Code', monospace; }
+        .bg-grid {
+            background-image: radial-gradient(circle, #334155 1px, transparent 1px);
+            background-size: 20px 20px;
+        }
+    </style>
+</head>
+<body class="text-slate-100 min-h-screen">
+    <div id="root">
+        <div class="flex items-center justify-center min-h-screen text-slate-500 font-mono">
+            <div class="flex flex-col items-center gap-4">
+                <i class="fa-solid fa-gear animate-spin text-4xl text-blue-500"></i>
+                <p>Ładowanie silnika geometrycznego...</p>
+            </div>
+        </div>
+    </div>
+    <script type="module" src="/index.tsx"></script>
+</body>
+</html>

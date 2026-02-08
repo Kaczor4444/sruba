@@ -1,0 +1,5 @@
+{
+  "name": "Blender Bolt Generator Pro",
+  "description": "Generate custom Python scripts for Blender to create precise bolts and screws with various head types, sizes, and tips.",
+  "requestFramePermissions": []
+}
