@@ -65,7 +65,7 @@ const App: React.FC = () => {
             >
               <div className="flex items-center gap-2 text-sm font-bold">
                 <i className="fa-solid fa-cube"></i>
-                Export GLTF
+                Export 3MF
               </div>
               <span className="text-[9px] opacity-80 uppercase font-mono">Universal Format</span>
             </button>
@@ -155,7 +155,7 @@ const App: React.FC = () => {
         <footer className="mt-8 pt-4 border-t border-slate-900 text-slate-600 text-[10px] text-center flex justify-between items-center">
           <span className="flex items-center gap-2">
             <i className="fa-solid fa-circle-info text-blue-500"></i>
-            Tip: Use GLTF export for Blender & other 3D software with separate objects.
+            Tip: Use 3MF export for Blender & other 3D software with separate objects.
           </span>
           <div className="flex gap-4">
             <span className="flex items-center gap-1"><i className="fa-solid fa-shield-halved"></i> 100% Manifold</span>

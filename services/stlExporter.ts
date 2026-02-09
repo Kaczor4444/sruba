@@ -1,6 +1,5 @@
 import * as THREE from 'three';
 import { STLExporter } from 'three/examples/jsm/exporters/STLExporter.js';
-import { GLTFExporter } from 'three/examples/jsm/exporters/GLTFExporter.js';
 // @ts-ignore - BufferGeometryUtils doesn't have types
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import * as fflate from 'fflate';
@@ -435,25 +434,148 @@ export const downloadSTL = (params: BoltParams) => {
   }
 };
 
-export const download3MF = async (params: BoltParams) => {
-  const meshGroup = generateMesh(params);
-  meshGroup.updateMatrixWorld(true);
-  const exporter = new GLTFExporter();
+// Helper to convert mesh to 3MF XML vertices and triangles
+const meshTo3MFGeometry = (mesh: THREE.Mesh): { vertices: string; triangles: string } => {
+  const geometry = mesh.geometry;
+  const position = geometry.attributes.position;
+  const index = geometry.index;
 
-  exporter.parse(
-    meshGroup,
-    (result) => {
-      const output = JSON.stringify(result, null, 2);
-      const blob = new Blob([output], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `bolt_kit.gltf`;
-      link.click();
-    },
-    (error) => {
-      console.error('Export error:', error);
-    },
-    { binary: false }
-  );
+  let verticesXML = '';
+  let trianglesXML = '';
+
+  // Generate vertices
+  for (let i = 0; i < position.count; i++) {
+    const x = position.getX(i);
+    const y = position.getY(i);
+    const z = position.getZ(i);
+    verticesXML += `      <vertex x="${x.toFixed(3)}" y="${y.toFixed(3)}" z="${z.toFixed(3)}"/>\n`;
+  }
+
+  // Generate triangles
+  if (index) {
+    for (let i = 0; i < index.count; i += 3) {
+      const v1 = index.getX(i);
+      const v2 = index.getX(i + 1);
+      const v3 = index.getX(i + 2);
+      trianglesXML += `      <triangle v1="${v1}" v2="${v2}" v3="${v3}"/>\n`;
+    }
+  } else {
+    // Non-indexed geometry
+    for (let i = 0; i < position.count; i += 3) {
+      trianglesXML += `      <triangle v1="${i}" v2="${i + 1}" v3="${i + 2}"/>\n`;
+    }
+  }
+
+  return { vertices: verticesXML, triangles: trianglesXML };
+};
+
+export const download3MF = (params: BoltParams) => {
+  try {
+    const files: Record<string, Uint8Array> = {};
+    let objectsXML = '';
+    let buildItemsXML = '';
+    let objectId = 1;
+    const spacing = 15; // Spacing between objects
+
+    // Generate each set of objects
+    for (let i = 0; i < params.quantity; i++) {
+      const setIndex = i + 1;
+      let xOffset = i * spacing * 3;
+
+      // Add bolt
+      console.log('--- Adding Bolt to 3MF', setIndex, '---');
+      const boltGroup = createSingleBolt(params);
+      const boltMesh = mergeGroupToMesh(boltGroup);
+      const boltGeo = meshTo3MFGeometry(boltMesh);
+
+      objectsXML += `  <object id="${objectId}" name="Bolt_${setIndex}" type="model">\n`;
+      objectsXML += `    <mesh>\n`;
+      objectsXML += `      <vertices>\n${boltGeo.vertices}      </vertices>\n`;
+      objectsXML += `      <triangles>\n${boltGeo.triangles}      </triangles>\n`;
+      objectsXML += `    </mesh>\n`;
+      objectsXML += `  </object>\n`;
+
+      buildItemsXML += `    <item objectid="${objectId}" transform="1 0 0 0 1 0 0 0 1 ${xOffset} 0 0"/>\n`;
+      objectId++;
+      xOffset += spacing;
+
+      // Add nut if enabled
+      if (params.hasNut) {
+        console.log('--- Adding Nut to 3MF', setIndex, '---');
+        const nutGroup = createSingleNut(params);
+        const nutMesh = mergeGroupToMesh(nutGroup);
+        const nutGeo = meshTo3MFGeometry(nutMesh);
+
+        objectsXML += `  <object id="${objectId}" name="Nut_${setIndex}" type="model">\n`;
+        objectsXML += `    <mesh>\n`;
+        objectsXML += `      <vertices>\n${nutGeo.vertices}      </vertices>\n`;
+        objectsXML += `      <triangles>\n${nutGeo.triangles}      </triangles>\n`;
+        objectsXML += `    </mesh>\n`;
+        objectsXML += `  </object>\n`;
+
+        buildItemsXML += `    <item objectid="${objectId}" transform="1 0 0 0 1 0 0 0 1 ${xOffset} 0 0"/>\n`;
+        objectId++;
+        xOffset += spacing;
+      }
+
+      // Add washer if enabled
+      if (params.hasWasher) {
+        console.log('--- Adding Washer to 3MF', setIndex, '---');
+        const washer = createSingleWasher(params);
+        const washerGeo = meshTo3MFGeometry(washer);
+
+        objectsXML += `  <object id="${objectId}" name="Washer_${setIndex}" type="model">\n`;
+        objectsXML += `    <mesh>\n`;
+        objectsXML += `      <vertices>\n${washerGeo.vertices}      </vertices>\n`;
+        objectsXML += `      <triangles>\n${washerGeo.triangles}      </triangles>\n`;
+        objectsXML += `    </mesh>\n`;
+        objectsXML += `  </object>\n`;
+
+        buildItemsXML += `    <item objectid="${objectId}" transform="1 0 0 0 1 0 0 0 1 ${xOffset} 0 0"/>\n`;
+        objectId++;
+      }
+    }
+
+    // Create 3D/3dmodel.model XML
+    const modelXML = `<?xml version="1.0" encoding="UTF-8"?>
+<model unit="millimeter" xml:lang="en-US" xmlns="http://schemas.microsoft.com/3dmanufacturing/core/2015/02">
+  <resources>
+${objectsXML}  </resources>
+  <build>
+${buildItemsXML}  </build>
+</model>`;
+
+    // Create [Content_Types].xml
+    const contentTypesXML = `<?xml version="1.0" encoding="UTF-8"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+  <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+  <Default Extension="model" ContentType="application/vnd.ms-package.3dmanufacturing-3dmodel+xml"/>
+</Types>`;
+
+    // Create _rels/.rels
+    const relsXML = `<?xml version="1.0" encoding="UTF-8"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Target="/3D/3dmodel.model" Id="rel0" Type="http://schemas.microsoft.com/3dmanufacturing/2013/01/3dmodel"/>
+</Relationships>`;
+
+    // Add files to ZIP
+    files['[Content_Types].xml'] = new TextEncoder().encode(contentTypesXML);
+    files['_rels/.rels'] = new TextEncoder().encode(relsXML);
+    files['3D/3dmodel.model'] = new TextEncoder().encode(modelXML);
+
+    // Create 3MF (ZIP) file
+    const zipped = fflate.zipSync(files, { level: 6 });
+    const blob = new Blob([zipped], { type: 'application/vnd.ms-package.3dmanufacturing-3dmodel+xml' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `bolt_kit_${params.quantity}x.3mf`;
+    link.click();
+    URL.revokeObjectURL(url);
+
+    console.log('3MF exported successfully with', objectId - 1, 'objects');
+  } catch (error) {
+    console.error('3MF Export Error:', error);
+    alert('3MF export failed! Check console for details.');
+  }
 };
