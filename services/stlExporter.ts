@@ -212,20 +212,48 @@ const createSingleBolt = (params: BoltParams): THREE.Group => {
   return group;
 };
 
-const createSingleNut = (params: BoltParams): THREE.Mesh => {
+const createSingleNut = (params: BoltParams): THREE.Group => {
+  const group = new THREE.Group();
+  const material = new THREE.MeshStandardMaterial({ color: 0x94a3b8 });
+
   const innerRadius = (params.d / 2) + 0.4;
   const outerRadius = params.headS / 2;
+
+  // Hexagonal body - FIX: properly initialize shape with moveTo
   const shape = new THREE.Shape();
   for (let i = 0; i < 6; i++) {
     const a = (i * 60 + 30) * Math.PI / 180;
-    shape.lineTo(outerRadius * Math.cos(a), outerRadius * Math.sin(a));
+    const x = outerRadius * Math.cos(a);
+    const y = outerRadius * Math.sin(a);
+    if (i === 0) shape.moveTo(x, y);
+    else shape.lineTo(x, y);
   }
+  shape.closePath();
+
   const hole = new THREE.Path();
   hole.absarc(0, 0, innerRadius, 0, Math.PI * 2, true);
   shape.holes.push(hole);
 
-  const geo = new THREE.ExtrudeGeometry(shape, { depth: params.nutHeight, bevelEnabled: false });
-  return new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color: 0x94a3b8 }));
+  const geo = new THREE.ExtrudeGeometry(shape, {
+    depth: params.nutHeight,
+    bevelEnabled: true,
+    bevelThickness: 0.15,
+    bevelSize: 0.15,
+    bevelSegments: 1
+  });
+  group.add(new THREE.Mesh(geo, material));
+
+  // Add internal threads - FIX: thread should be INSIDE the hole
+  const threadRadius = innerRadius - params.threadDepth / 2;
+  const numThreads = Math.floor(params.nutHeight / params.pitch);
+
+  for (let i = 0; i < numThreads; i++) {
+    const threadGeo = new THREE.TorusGeometry(threadRadius, params.threadDepth / 2, 8, 32);
+    threadGeo.translate(0, 0, (i * params.pitch) + params.pitch / 2);
+    group.add(new THREE.Mesh(threadGeo, material));
+  }
+
+  return group;
 };
 
 const createSingleWasher = (params: BoltParams): THREE.Mesh => {
