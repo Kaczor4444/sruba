@@ -97,6 +97,34 @@ const Sidebar: React.FC<SidebarProps> = ({ params, setParams }) => {
           </p>
         </div>
 
+        {/* 3D Printing Settings */}
+        <section className="p-4 bg-gradient-to-br from-orange-900/30 to-red-900/20 border border-orange-800/50 rounded-xl space-y-4">
+          <div className="flex items-center gap-2 mb-3">
+            <i className="fa-solid fa-print text-orange-400"></i>
+            <h3 className="text-sm font-bold text-white">3D Printing</h3>
+            <span className="text-[9px] bg-orange-600/30 text-orange-300 px-2 py-0.5 rounded-full font-mono">Tolerances</span>
+          </div>
+          <div className="mb-4">
+            <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">Nozzle Size (mm)</label>
+            <select
+              name="nozzleSize"
+              value={params.nozzleSize}
+              onChange={handleChange}
+              className="w-full bg-slate-800 border border-slate-700 rounded-md px-3 py-2 text-sm focus:outline-none text-slate-200 font-mono"
+            >
+              <option value={0.2}>0.2mm (High Precision)</option>
+              <option value={0.4}>0.4mm (Standard)</option>
+              <option value={0.6}>0.6mm (Fast Print)</option>
+              <option value={0.8}>0.8mm (Very Fast)</option>
+            </select>
+          </div>
+          <div className="text-[9px] text-slate-500 space-y-1">
+            <p><i className="fa-solid fa-info-circle text-orange-400"></i> Larger nozzles = more clearance</p>
+            <p className="pl-4">Bolt reduced by: {params.nozzleSize <= 0.2 ? '0.15' : params.nozzleSize <= 0.4 ? '0.2' : params.nozzleSize <= 0.6 ? '0.3' : '0.4'}mm</p>
+            <p className="pl-4">Nut clearance: {params.nozzleSize <= 0.2 ? '0.25' : params.nozzleSize <= 0.4 ? '0.35' : params.nozzleSize <= 0.6 ? '0.5' : '0.6'}mm</p>
+          </div>
+        </section>
+
         {/* Batch Production Section */}
         <section className="p-4 bg-blue-500/5 border border-blue-500/20 rounded-xl space-y-4">
           <h2 className="text-xs font-bold text-blue-400 flex items-center gap-2 uppercase">

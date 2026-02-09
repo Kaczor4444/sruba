@@ -33,6 +33,8 @@ export interface BoltParams {
   socketDepthPercent: number;   // Głębokość zagłębienia 0-100%
   tipType: TipType;
   tipLength: number;   // only used if tipType is POINTED or DOG_POINT
+  // 3D Printing params
+  nozzleSize: number;  // nozzle diameter in mm (0.2, 0.4, 0.6, 0.8) - affects tolerances
   // Production params
   quantity: number;
   hasNut: boolean;

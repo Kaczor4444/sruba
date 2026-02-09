@@ -22,6 +22,7 @@ const App: React.FC = () => {
     socketDepthPercent: 70,
     tipType: TipType.FLAT,
     tipLength: 5.0,
+    nozzleSize: 0.4,  // Standard 0.4mm nozzle
     quantity: 1,
     hasNut: false,
     nutHeight: 3.2,

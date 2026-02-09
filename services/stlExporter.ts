@@ -5,6 +5,27 @@ import * as fflate from 'fflate';
 import { SUBTRACTION, Brush, Evaluator } from 'three-bvh-csg';
 import { BoltParams, HeadType, SocketType, TipType } from '../types.ts';
 
+// ===== 3D PRINTING TOLERANCE CALCULATOR =====
+
+/**
+ * Calculate 3D printing offsets based on nozzle size
+ * Larger nozzles need more clearance due to filament spread and lower precision
+ */
+const calculate3DPrintingOffsets = (nozzleSize: number) => {
+  // Bolt offset: how much to reduce bolt diameter (makes bolt thinner)
+  // Nut clearance: extra space in nut hole (makes nut hole larger)
+
+  if (nozzleSize <= 0.2) {
+    return { boltOffset: 0.15, nutClearance: 0.25 };
+  } else if (nozzleSize <= 0.4) {
+    return { boltOffset: 0.2, nutClearance: 0.35 };
+  } else if (nozzleSize <= 0.6) {
+    return { boltOffset: 0.3, nutClearance: 0.5 };
+  } else {
+    return { boltOffset: 0.4, nutClearance: 0.6 };
+  }
+};
+
 // ===== HELPER FUNCTIONS FOR HEAD GEOMETRY =====
 
 const createHeadGeometry = (params: BoltParams): THREE.BufferGeometry => {
@@ -176,19 +197,22 @@ const createHeadWithSocket = (params: BoltParams): THREE.Mesh => {
 const createSingleBolt = (params: BoltParams): THREE.Group => {
   const group = new THREE.Group();
   const material = new THREE.MeshStandardMaterial({ color: 0x94a3b8 });
-  
+
+  // Calculate 3D printing offsets
+  const offsets = calculate3DPrintingOffsets(params.nozzleSize);
+
   // Łeb
   const head = createHeadWithSocket(params);
   group.add(head);
 
-  // Trzpień
-  const shaftRadius = (params.d / 2) - params.threadDepth;
+  // Trzpień - REDUCED by boltOffset for 3D printing clearance
+  const shaftRadius = (params.d / 2) - params.threadDepth - offsets.boltOffset;
   const shaftGeo = new THREE.CylinderGeometry(shaftRadius, shaftRadius, params.length, 32);
   shaftGeo.rotateX(Math.PI / 2);
   shaftGeo.translate(0, 0, params.headH + params.length / 2);
   group.add(new THREE.Mesh(shaftGeo, material));
 
-  // Gwinty (uproszczone pierścienie)
+  // Gwinty (uproszczone pierścienie) - also adjusted
   const numThreads = Math.floor(params.length / params.pitch);
   for (let i = 0; i < numThreads; i++) {
     const threadGeo = new THREE.TorusGeometry(shaftRadius + params.threadDepth/2, params.threadDepth/2, 8, 32);
@@ -216,11 +240,13 @@ const createSingleNut = (params: BoltParams): THREE.Group => {
   const group = new THREE.Group();
   const material = new THREE.MeshStandardMaterial({ color: 0x94a3b8 });
 
-  // Inner hole should fit bolt with proper clearance
-  // Bolt thread radius = d/2 - threadDepth/2
-  // Nut should have ~0.15mm clearance for smooth assembly
-  const clearance = 0.15;
-  const innerRadius = (params.d / 2) + clearance;
+  // Calculate 3D printing offsets
+  const offsets = calculate3DPrintingOffsets(params.nozzleSize);
+
+  // Inner hole INCREASED by nutClearance for 3D printing fit
+  // Bolt outer diameter after offset = d - (2 * boltOffset)
+  // Nut needs additional clearance for smooth threading
+  const innerRadius = (params.d / 2) + offsets.nutClearance;
   const outerRadius = params.headS / 2;
 
   // Hexagonal body - FIX: properly initialize shape with moveTo
