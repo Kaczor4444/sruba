@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { STLExporter } from 'three/examples/jsm/exporters/STLExporter.js';
 // @ts-ignore - BufferGeometryUtils doesn't have types
-import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
+import { mergeGeometries, mergeVertices } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import * as fflate from 'fflate';
 import { SUBTRACTION, Brush, Evaluator } from 'three-bvh-csg';
 import { BoltParams, HeadType, SocketType, TipType } from '../types.ts';
@@ -216,7 +216,8 @@ const createSingleBolt = (params: BoltParams): THREE.Group => {
   // Gwinty (uproszczone pierścienie) - also adjusted
   const numThreads = Math.floor(params.length / params.pitch);
   for (let i = 0; i < numThreads; i++) {
-    const threadGeo = new THREE.TorusGeometry(shaftRadius + params.threadDepth/2, params.threadDepth/2, 8, 32);
+    // Increased from 8 to 12 radial segments for better manifold geometry
+    const threadGeo = new THREE.TorusGeometry(shaftRadius + params.threadDepth/2, params.threadDepth/2, 12, 32);
     threadGeo.translate(0, 0, params.headH + (i * params.pitch));
     group.add(new THREE.Mesh(threadGeo, material));
   }
@@ -279,7 +280,8 @@ const createSingleNut = (params: BoltParams): THREE.Group => {
   const numThreads = Math.floor(params.nutHeight / params.pitch);
 
   for (let i = 0; i < numThreads; i++) {
-    const threadGeo = new THREE.TorusGeometry(threadRadius, params.threadDepth / 2, 8, 32);
+    // Increased from 8 to 12 radial segments for better manifold geometry
+    const threadGeo = new THREE.TorusGeometry(threadRadius, params.threadDepth / 2, 12, 32);
     threadGeo.translate(0, 0, (i * params.pitch) + params.pitch / 2);
     group.add(new THREE.Mesh(threadGeo, material));
   }
@@ -373,9 +375,15 @@ const mergeGroupToMesh = (group: THREE.Group): THREE.Mesh => {
     return new THREE.Mesh(new THREE.BufferGeometry(), new THREE.MeshStandardMaterial());
   }
 
-  console.log('Merged geometry vertices:', mergedGeo.attributes.position?.count || 0);
+  console.log('Merged geometry vertices before cleanup:', mergedGeo.attributes.position?.count || 0);
 
-  return new THREE.Mesh(mergedGeo, new THREE.MeshStandardMaterial());
+  // CRITICAL: Merge duplicate vertices to fix non-manifold edges
+  const cleanedGeo = mergeVertices(mergedGeo, 0.0001);
+  cleanedGeo.computeVertexNormals();
+
+  console.log('Final geometry vertices after mergeVertices:', cleanedGeo.attributes.position?.count || 0);
+
+  return new THREE.Mesh(cleanedGeo, new THREE.MeshStandardMaterial());
 };
 
 export const downloadSTL = (params: BoltParams) => {
