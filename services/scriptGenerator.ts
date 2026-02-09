@@ -2,16 +2,19 @@
 import { BoltParams, HeadType, TipType } from '../types.ts';
 
 export const generateBlenderScript = (params: BoltParams): string => {
-  const { 
-    d, pitch, headS, headH, length, threadDepth, 
-    headType, tipType, tipLength, quantity, 
-    hasNut, nutHeight, hasWasher, washerThickness, washerOuterD 
+  const {
+    d, pitch, headS, headH, length, threadDepth,
+    headType, tipType, tipLength, quantity,
+    hasNut, nutHeight, hasWasher, washerThickness, washerOuterD
   } = params;
-  
+
   const isExternalHex = headType === HeadType.HEX;
   const isSquare = headType === HeadType.SQUARE;
   const headVertices = isExternalHex ? 6 : isSquare ? 4 : 64;
   const shaftRadius = d / 2 - threadDepth;
+
+  // Convert JavaScript booleans to Python booleans
+  const pyBool = (val: boolean) => val ? 'True' : 'False';
 
   return `import bpy
 import math
@@ -24,9 +27,9 @@ HEAD_H = ${headH.toFixed(2)}
 LENGTH = ${length.toFixed(2)}
 THREAD_DEPTH = ${threadDepth.toFixed(2)}
 QUANTITY = ${quantity}
-HAS_NUT = ${hasNut}
+HAS_NUT = ${pyBool(hasNut)}
 NUT_H = ${nutHeight.toFixed(2)}
-HAS_WASHER = ${hasWasher}
+HAS_WASHER = ${pyBool(hasWasher)}
 W_THICK = ${washerThickness.toFixed(2)}
 W_OUTER = ${washerOuterD.toFixed(2)}
 
@@ -43,8 +46,8 @@ def create_bolt(idx, x_off, y_off):
     bpy.ops.mesh.primitive_cylinder_add(vertices=${headVertices}, radius=HEAD_S/2, depth=HEAD_H, location=(x_off, y_off, HEAD_H/2))
     head = bpy.context.active_object
     head.name = f"Bolt_{idx}_Head"
-    if ${headType === HeadType.HEX}: head.rotation_euler[2] = math.pi/6
-    if ${headType === HeadType.SQUARE}: head.rotation_euler[2] = math.pi/4
+    if ${pyBool(headType === HeadType.HEX)}: head.rotation_euler[2] = math.pi/6
+    if ${pyBool(headType === HeadType.SQUARE)}: head.rotation_euler[2] = math.pi/4
 
     bpy.ops.mesh.primitive_cylinder_add(vertices=48, radius=${shaftRadius.toFixed(4)}, depth=LENGTH, location=(x_off, y_off, HEAD_H + LENGTH/2))
     shaft = bpy.context.active_object
