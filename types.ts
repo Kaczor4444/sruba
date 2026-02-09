@@ -1,11 +1,18 @@
 
 export enum HeadType {
-  HEX = 'HEX',
-  HEX_SOCKET = 'HEX_SOCKET',
-  TORX = 'TORX',
-  ROUND_SLOT = 'ROUND_SLOT',
-  ROUND_PHILLIPS = 'ROUND_PHILLIPS',
-  SQUARE = 'SQUARE'
+  HEX = 'HEX',              // Zewnętrzny sześciokąt
+  SQUARE = 'SQUARE',        // Zewnętrzny kwadrat
+  ROUND = 'ROUND',          // Okrągły cylindryczny
+  BUTTON_HEAD = 'BUTTON_HEAD',      // ISO 7380 - grzybkowy z niskim profilem
+  COUNTERSUNK = 'COUNTERSUNK'       // DIN 963/965 - zatopiony stożkowy
+}
+
+export enum SocketType {
+  NONE = 'NONE',            // Bez zagłębienia
+  HEX = 'HEX',              // Hex socket (imbus)
+  TORX = 'TORX',            // Torx (gwiazdka)
+  PHILLIPS = 'PHILLIPS',    // Phillips (krzyżak)
+  SLOT = 'SLOT'             // Slot (płaski)
 }
 
 export enum TipType {
@@ -22,13 +29,15 @@ export interface BoltParams {
   length: number;      // shaft length
   threadDepth: number; // thread depth
   headType: HeadType;
+  socketType: SocketType;       // Typ zagłębienia (niezależnie od headType)
+  socketDepthPercent: number;   // Głębokość zagłębienia 0-100%
   tipType: TipType;
   tipLength: number;   // only used if tipType is POINTED or DOG_POINT
   // Production params
-  quantity: number;    
-  hasNut: boolean;     
-  nutHeight: number;   
-  hasWasher: boolean;  
+  quantity: number;
+  hasNut: boolean;
+  nutHeight: number;
+  hasWasher: boolean;
   washerThickness: number;
   washerOuterD: number;
 }

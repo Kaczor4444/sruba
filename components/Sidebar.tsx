@@ -1,6 +1,7 @@
 
 import React from 'react';
-import { BoltParams, HeadType, TipType } from '../types.ts';
+import { BoltParams, HeadType, SocketType, TipType } from '../types.ts';
+import { BOLT_PRESETS } from '../presets.ts';
 
 interface SidebarProps {
   params: BoltParams;
@@ -8,6 +9,13 @@ interface SidebarProps {
 }
 
 const Sidebar: React.FC<SidebarProps> = ({ params, setParams }) => {
+  const handlePresetSelect = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const presetKey = e.target.value;
+    if (presetKey && BOLT_PRESETS[presetKey]) {
+      setParams(BOLT_PRESETS[presetKey].params);
+    }
+  };
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target;
     const val = type === 'checkbox' ? (e.target as HTMLInputElement).checked : (type === 'number' ? parseFloat(value) : value);
@@ -47,6 +55,48 @@ const Sidebar: React.FC<SidebarProps> = ({ params, setParams }) => {
       </div>
 
       <div className="p-6 space-y-8">
+        {/* Quick Presets Section */}
+        <div className="bg-gradient-to-br from-blue-900/30 to-purple-900/20 border border-blue-800/50 rounded-xl p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <i className="fa-solid fa-bolt text-blue-400"></i>
+            <h3 className="text-sm font-bold text-white">Quick Presets</h3>
+            <span className="text-[9px] bg-blue-600/30 text-blue-300 px-2 py-0.5 rounded-full font-mono">ISO 4762</span>
+          </div>
+          <select
+            onChange={handlePresetSelect}
+            defaultValue=""
+            className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all text-slate-200 font-mono"
+          >
+            <option value="" disabled>Select standard size...</option>
+            <optgroup label="M3 (3mm)">
+              <option value="M3x10">M3×10 - Socket Head</option>
+              <option value="M3x16">M3×16 - Socket Head</option>
+            </optgroup>
+            <optgroup label="M4 (4mm)">
+              <option value="M4x20">M4×20 - Socket Head</option>
+              <option value="M4x30">M4×30 - Socket Head</option>
+            </optgroup>
+            <optgroup label="M5 (5mm)">
+              <option value="M5x25">M5×25 - Socket Head</option>
+              <option value="M5x40">M5×40 - Socket Head</option>
+            </optgroup>
+            <optgroup label="M6 (6mm)">
+              <option value="M6x30">M6×30 - Socket Head</option>
+              <option value="M6x50">M6×50 - Socket Head</option>
+            </optgroup>
+            <optgroup label="M8 (8mm)">
+              <option value="M8x40">M8×40 - Socket Head</option>
+              <option value="M8x60">M8×60 - Socket Head</option>
+            </optgroup>
+            <optgroup label="M10 (10mm)">
+              <option value="M10x50">M10×50 - Socket Head</option>
+            </optgroup>
+          </select>
+          <p className="text-[9px] text-slate-500 mt-2 italic">
+            <i className="fa-solid fa-info-circle"></i> All dimensions per ISO 4762 standard
+          </p>
+        </div>
+
         {/* Batch Production Section */}
         <section className="p-4 bg-blue-500/5 border border-blue-500/20 rounded-xl space-y-4">
           <h2 className="text-xs font-bold text-blue-400 flex items-center gap-2 uppercase">
@@ -72,13 +122,49 @@ const Sidebar: React.FC<SidebarProps> = ({ params, setParams }) => {
                 <option value={HeadType.HEX}>Hexagonal</option>
                 <option value={HeadType.SQUARE}>Square</option>
               </optgroup>
-              <optgroup label="Sockets">
-                <option value={HeadType.TORX}>Torx (Star)</option>
-                <option value={HeadType.HEX_SOCKET}>Allen Socket</option>
-                <option value={HeadType.ROUND_PHILLIPS}>Phillips</option>
-                <option value={HeadType.ROUND_SLOT}>Slotted</option>
+              <optgroup label="Cylindrical">
+                <option value={HeadType.ROUND}>Round (Cylindrical)</option>
+                <option value={HeadType.BUTTON_HEAD}>Button Head (ISO 7380)</option>
+              </optgroup>
+              <optgroup label="Flush">
+                <option value={HeadType.COUNTERSUNK}>Countersunk (Flat)</option>
               </optgroup>
             </select>
+          </div>
+          <div className="mb-4">
+            <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">Socket Type</label>
+            <select
+              name="socketType"
+              value={params.socketType}
+              onChange={handleChange}
+              className="w-full bg-slate-800 border border-slate-700 rounded-md px-3 py-2 text-sm focus:outline-none text-slate-200"
+            >
+              <option value={SocketType.NONE}>None (Solid Head)</option>
+              <option value={SocketType.HEX}>Hex Socket (Imbus)</option>
+              <option value={SocketType.TORX}>Torx (Star)</option>
+              <option value={SocketType.PHILLIPS}>Phillips (Cross)</option>
+              <option value={SocketType.SLOT}>Slot (Flat)</option>
+            </select>
+          </div>
+          <div className="mb-4">
+            <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1 flex items-center justify-between">
+              <span>Socket Depth</span>
+              <span className="text-xs text-slate-400 font-mono">{params.socketDepthPercent}%</span>
+            </label>
+            <input
+              type="range"
+              name="socketDepthPercent"
+              value={params.socketDepthPercent}
+              onChange={handleChange}
+              min="0"
+              max="100"
+              step="5"
+              className="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-blue-500"
+            />
+            <div className="flex justify-between text-[9px] text-slate-600 mt-1">
+              <span>Shallow</span>
+              <span>Deep</span>
+            </div>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <InputGroup label="D (Nominal)" name="d" value={params.d} />

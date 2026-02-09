@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { BoltParams, HeadType, TipType } from './types.ts';
+import { BoltParams, HeadType, SocketType, TipType } from './types.ts';
 import Sidebar from './components/Sidebar.tsx';
 import ThreePreview from './components/ThreePreview.tsx';
 import VisualPreview from './components/VisualPreview.tsx';
@@ -17,7 +17,9 @@ const App: React.FC = () => {
     headH: 3.0,
     length: 20.0,
     threadDepth: 0.35,
-    headType: HeadType.HEX_SOCKET,
+    headType: HeadType.ROUND,
+    socketType: SocketType.HEX,
+    socketDepthPercent: 70,
     tipType: TipType.FLAT,
     tipLength: 5.0,
     quantity: 1,
