@@ -53,6 +53,20 @@ def create_bolt(idx, x_off, y_off):
     shaft = bpy.context.active_object
     shaft.name = f"Bolt_{idx}_Shaft"
 
+    # Add threads (simplified as torus rings)
+    num_threads = int(LENGTH / PITCH)
+    for t in range(num_threads):
+        z_pos = HEAD_H + (t * PITCH)
+        bpy.ops.mesh.primitive_torus_add(
+            major_radius=${shaftRadius.toFixed(4)} + THREAD_DEPTH/2,
+            minor_radius=THREAD_DEPTH/2,
+            major_segments=32,
+            minor_segments=12,
+            location=(x_off, y_off, z_pos)
+        )
+        thread = bpy.context.active_object
+        thread.name = f"Bolt_{idx}_Thread_{t}"
+
     if "${tipType}" == "POINTED":
         bpy.ops.mesh.primitive_cone_add(vertices=48, radius1=${shaftRadius.toFixed(4)}, radius2=0.0, depth=${tipLength}, location=(x_off, y_off, HEAD_H + LENGTH + ${tipLength}/2))
     elif "${tipType}" == "DOG_POINT":
@@ -71,6 +85,21 @@ def create_nut(idx, x_off, y_off):
     bpy.context.view_layer.objects.active = nut
     bpy.ops.object.modifier_apply(modifier=mod.name)
     bpy.data.objects.remove(cutter, do_unlink=True)
+
+    # Add internal threads (simplified as torus rings)
+    thread_radius = (D/2) + 0.2 - THREAD_DEPTH/2
+    num_threads = int(NUT_H / PITCH)
+    for t in range(num_threads):
+        z_pos = (t * PITCH) + PITCH/2
+        bpy.ops.mesh.primitive_torus_add(
+            major_radius=thread_radius,
+            minor_radius=THREAD_DEPTH/2,
+            major_segments=32,
+            minor_segments=12,
+            location=(x_off, y_off, z_pos)
+        )
+        thread = bpy.context.active_object
+        thread.name = f"Nut_{idx}_Thread_{t}"
 
 def create_washer(idx, x_off, y_off):
     bpy.ops.mesh.primitive_cylinder_add(vertices=64, radius=W_OUTER/2, depth=W_THICK, location=(x_off, y_off, W_THICK/2))
