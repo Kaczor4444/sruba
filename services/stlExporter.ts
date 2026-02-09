@@ -2,17 +2,18 @@ import * as THREE from 'three';
 import { STLExporter } from 'three/examples/jsm/exporters/STLExporter.js';
 import { GLTFExporter } from 'three/examples/jsm/exporters/GLTFExporter.js';
 import * as fflate from 'fflate';
+import { SUBTRACTION, Brush, Evaluator } from 'three-bvh-csg';
 import { BoltParams, HeadType, TipType } from '../types.ts';
 
 const createHeadWithSocket = (params: BoltParams): THREE.Mesh => {
   const hR = params.headS / 2;
   const hH = params.headH;
   const socketDepth = hH * 0.7;
-  
+
   const isExternalHex = params.headType === HeadType.HEX;
   const isExternalSquare = params.headType === HeadType.SQUARE;
 
-  // Tworzymy kształt łba
+  // Tworzymy kształt łba (PEŁNY, bez dziury)
   const shape = new THREE.Shape();
   if (isExternalHex) {
     for (let i = 0; i < 6; i++) {
@@ -34,9 +35,9 @@ const createHeadWithSocket = (params: BoltParams): THREE.Mesh => {
     shape.absarc(0, 0, hR, 0, Math.PI * 2, false);
   }
 
-  // Definicja otworu (gniazda)
+  // Definicja zagłębienia (socket)
   const socketR = hR * 0.6;
-  const hole = new THREE.Path();
+  const socketShape = new THREE.Path();
   let hasSocket = true;
 
   switch (params.headType) {
@@ -45,9 +46,9 @@ const createHeadWithSocket = (params: BoltParams): THREE.Mesh => {
         const a = (i * 60 + 30) * Math.PI / 180;
         const x = socketR * Math.cos(a);
         const y = socketR * Math.sin(a);
-        if (i === 0) hole.moveTo(x, y); else hole.lineTo(x, y);
+        if (i === 0) socketShape.moveTo(x, y); else socketShape.lineTo(x, y);
       }
-      hole.closePath();
+      socketShape.closePath();
       break;
     case HeadType.TORX:
       for (let i = 0; i < 12; i++) {
@@ -55,37 +56,117 @@ const createHeadWithSocket = (params: BoltParams): THREE.Mesh => {
         const r = i % 2 === 0 ? socketR : socketR * 0.7;
         const x = r * Math.cos(a);
         const y = r * Math.sin(a);
-        if (i === 0) hole.moveTo(x, y); else hole.lineTo(x, y);
+        if (i === 0) socketShape.moveTo(x, y); else socketShape.lineTo(x, y);
       }
-      hole.closePath();
+      socketShape.closePath();
       break;
     case HeadType.ROUND_SLOT:
       const sw = hR * 1.8;
       const sh = hR * 0.35;
-      hole.moveTo(-sw/2, -sh/2);
-      hole.lineTo(sw/2, -sh/2);
-      hole.lineTo(sw/2, sh/2);
-      hole.lineTo(-sw/2, sh/2);
-      hole.closePath();
+      socketShape.moveTo(-sw/2, -sh/2);
+      socketShape.lineTo(sw/2, -sh/2);
+      socketShape.lineTo(sw/2, sh/2);
+      socketShape.lineTo(-sw/2, sh/2);
+      socketShape.closePath();
       break;
     case HeadType.ROUND_PHILLIPS:
       const pw = hR * 1.6;
       const ph = hR * 0.35;
       const c = ph/2;
-      hole.moveTo(-c, -pw/2); hole.lineTo(c, -pw/2); hole.lineTo(c, -c);
-      hole.lineTo(pw/2, -c); hole.lineTo(pw/2, c); hole.lineTo(c, c);
-      hole.lineTo(c, pw/2); hole.lineTo(-c, pw/2); hole.lineTo(-c, c);
-      hole.lineTo(-pw/2, c); hole.lineTo(-pw/2, -c); hole.lineTo(-c, -c);
-      hole.closePath();
+      socketShape.moveTo(-c, -pw/2); socketShape.lineTo(c, -pw/2); socketShape.lineTo(c, -c);
+      socketShape.lineTo(pw/2, -c); socketShape.lineTo(pw/2, c); socketShape.lineTo(c, c);
+      socketShape.lineTo(c, pw/2); socketShape.lineTo(-c, pw/2); socketShape.lineTo(-c, c);
+      socketShape.lineTo(-pw/2, c); socketShape.lineTo(-pw/2, -c); socketShape.lineTo(-c, -c);
+      socketShape.closePath();
       break;
     default:
       hasSocket = false;
   }
 
-  if (hasSocket) shape.holes.push(hole);
+  // Jeśli ma zagłębienie, użyj CSG do stworzenia płytkiego zagłębienia
+  if (hasSocket) {
+    try {
+      // Tworzę pełny łeb
+      const fullHeadGeo = new THREE.ExtrudeGeometry(shape, { depth: hH, bevelEnabled: false });
 
-  const geo = new THREE.ExtrudeGeometry(shape, { depth: hH, bevelEnabled: false });
-  return new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color: 0x94a3b8 }));
+      // Tworzę zagłębienie
+      const socketShapeForExtrude = new THREE.Shape();
+      // Kopiuję punkty z socketShape do Shape
+      if (params.headType === HeadType.HEX_SOCKET) {
+        for (let i = 0; i < 6; i++) {
+          const a = (i * 60 + 30) * Math.PI / 180;
+          const x = socketR * Math.cos(a);
+          const y = socketR * Math.sin(a);
+          if (i === 0) socketShapeForExtrude.moveTo(x, y); else socketShapeForExtrude.lineTo(x, y);
+        }
+        socketShapeForExtrude.closePath();
+      } else if (params.headType === HeadType.TORX) {
+        for (let i = 0; i < 12; i++) {
+          const a = (i * 30) * Math.PI / 180;
+          const r = i % 2 === 0 ? socketR : socketR * 0.7;
+          const x = r * Math.cos(a);
+          const y = r * Math.sin(a);
+          if (i === 0) socketShapeForExtrude.moveTo(x, y); else socketShapeForExtrude.lineTo(x, y);
+        }
+        socketShapeForExtrude.closePath();
+      } else if (params.headType === HeadType.ROUND_SLOT) {
+        const sw = hR * 1.8;
+        const sh = hR * 0.35;
+        socketShapeForExtrude.moveTo(-sw/2, -sh/2);
+        socketShapeForExtrude.lineTo(sw/2, -sh/2);
+        socketShapeForExtrude.lineTo(sw/2, sh/2);
+        socketShapeForExtrude.lineTo(-sw/2, sh/2);
+        socketShapeForExtrude.closePath();
+      } else if (params.headType === HeadType.ROUND_PHILLIPS) {
+        const pw = hR * 1.6;
+        const ph = hR * 0.35;
+        const c = ph/2;
+        socketShapeForExtrude.moveTo(-c, -pw/2);
+        socketShapeForExtrude.lineTo(c, -pw/2);
+        socketShapeForExtrude.lineTo(c, -c);
+        socketShapeForExtrude.lineTo(pw/2, -c);
+        socketShapeForExtrude.lineTo(pw/2, c);
+        socketShapeForExtrude.lineTo(c, c);
+        socketShapeForExtrude.lineTo(c, pw/2);
+        socketShapeForExtrude.lineTo(-c, pw/2);
+        socketShapeForExtrude.lineTo(-c, c);
+        socketShapeForExtrude.lineTo(-pw/2, c);
+        socketShapeForExtrude.lineTo(-pw/2, -c);
+        socketShapeForExtrude.lineTo(-c, -c);
+        socketShapeForExtrude.closePath();
+      } else {
+        // Fallback dla innych typów - pełna dziura
+        shape.holes.push(socketShape);
+        const headWithHoleGeo = new THREE.ExtrudeGeometry(shape, { depth: hH, bevelEnabled: false });
+        return new THREE.Mesh(headWithHoleGeo, new THREE.MeshStandardMaterial({ color: 0x94a3b8 }));
+      }
+
+      const socketGeo = new THREE.ExtrudeGeometry(socketShapeForExtrude, { depth: socketDepth, bevelEnabled: false });
+
+      // Tworze Brush'e dla CSG
+      const headBrush = new Brush(fullHeadGeo);
+      const socketBrush = new Brush(socketGeo);
+
+      headBrush.updateMatrixWorld();
+      socketBrush.updateMatrixWorld();
+
+      // Operacja CSG - odejmij zagłębienie od łba
+      const evaluator = new Evaluator();
+      const resultBrush = evaluator.evaluate(headBrush, socketBrush, SUBTRACTION);
+
+      return new THREE.Mesh(resultBrush.geometry, new THREE.MeshStandardMaterial({ color: 0x94a3b8 }));
+    } catch (error) {
+      console.error('CSG error, using fallback:', error);
+      // Fallback
+      shape.holes.push(socketShape);
+      const headWithHoleGeo = new THREE.ExtrudeGeometry(shape, { depth: hH, bevelEnabled: false });
+      return new THREE.Mesh(headWithHoleGeo, new THREE.MeshStandardMaterial({ color: 0x94a3b8 }));
+    }
+  }
+
+  // Łeb bez zagłębienia (HEX, SQUARE)
+  const fullHeadGeo = new THREE.ExtrudeGeometry(shape, { depth: hH, bevelEnabled: false });
+  return new THREE.Mesh(fullHeadGeo, new THREE.MeshStandardMaterial({ color: 0x94a3b8 }));
 };
 
 const createSingleBolt = (params: BoltParams): THREE.Group => {
