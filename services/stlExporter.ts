@@ -1,6 +1,8 @@
 import * as THREE from 'three';
 import { STLExporter } from 'three/examples/jsm/exporters/STLExporter.js';
 import { GLTFExporter } from 'three/examples/jsm/exporters/GLTFExporter.js';
+// @ts-ignore - BufferGeometryUtils doesn't have types
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import * as fflate from 'fflate';
 import { SUBTRACTION, Brush, Evaluator } from 'three-bvh-csg';
 import { BoltParams, HeadType, SocketType, TipType } from '../types.ts';
@@ -336,17 +338,101 @@ export const generateMesh = (params: BoltParams): THREE.Group => {
   return masterGroup;
 };
 
+// Helper function to merge Group into single Mesh for STL export
+const mergeGroupToMesh = (group: THREE.Group): THREE.Mesh => {
+  const geometries: THREE.BufferGeometry[] = [];
+
+  group.traverse((child: any) => {
+    if (child instanceof THREE.Mesh) {
+      let geo = child.geometry.clone();
+      child.updateWorldMatrix(true, false);
+      geo.applyMatrix4(child.matrixWorld);
+
+      // CRITICAL FIX: Remove indices to ensure all geometries are compatible
+      // BufferGeometryUtils.mergeGeometries requires all geometries to have
+      // the same index configuration (all indexed or all non-indexed)
+      if (geo.index !== null) {
+        geo = geo.toNonIndexed();
+      }
+
+      console.log('Added geometry with vertices:', geo.attributes.position?.count || 0);
+      geometries.push(geo);
+    }
+  });
+
+  console.log('Total geometries to merge:', geometries.length);
+
+  if (geometries.length === 0) {
+    console.error('No geometries found in group');
+    return new THREE.Mesh(new THREE.BufferGeometry(), new THREE.MeshStandardMaterial());
+  }
+
+  const mergedGeo = mergeGeometries(geometries, false) as THREE.BufferGeometry;
+
+  if (!mergedGeo) {
+    console.error('mergeGeometries returned null');
+    return new THREE.Mesh(new THREE.BufferGeometry(), new THREE.MeshStandardMaterial());
+  }
+
+  console.log('Merged geometry vertices:', mergedGeo.attributes.position?.count || 0);
+
+  return new THREE.Mesh(mergedGeo, new THREE.MeshStandardMaterial());
+};
+
 export const downloadSTL = (params: BoltParams) => {
-  const meshGroup = generateMesh(params);
-  meshGroup.updateMatrixWorld(true);
-  const exporter = new STLExporter();
-  const stlString = exporter.parse(meshGroup, { binary: true });
-  const blob = new Blob([stlString], { type: 'application/octet-stream' });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = `bolt_kit.stl`;
-  link.click();
+  try {
+    const exporter = new STLExporter();
+    const files: Record<string, Uint8Array> = {};
+
+    // Generate individual parts
+    for (let i = 0; i < params.quantity; i++) {
+      const boltIndex = i + 1;
+
+      // Export bolt - merge all meshes into one
+      console.log('--- Exporting Bolt', boltIndex, '---');
+      const boltGroup = createSingleBolt(params);
+      const boltMesh = mergeGroupToMesh(boltGroup);
+      const boltSTL = exporter.parse(boltMesh, { binary: true }) as DataView;
+      console.log('Bolt STL size:', boltSTL.byteLength, 'bytes');
+
+      // Convert DataView to Uint8Array for fflate
+      const boltArray = new Uint8Array(boltSTL.buffer);
+      console.log('Bolt array length:', boltArray.length);
+      files[`bolt_${boltIndex}.stl`] = boltArray;
+
+      // Export nut if enabled
+      if (params.hasNut) {
+        console.log('--- Exporting Nut', boltIndex, '---');
+        const nutGroup = createSingleNut(params);
+        const nutMesh = mergeGroupToMesh(nutGroup);
+        const nutSTL = exporter.parse(nutMesh, { binary: true }) as DataView;
+        console.log('Nut STL size:', nutSTL.byteLength, 'bytes');
+        files[`nut_${boltIndex}.stl`] = new Uint8Array(nutSTL.buffer);
+      }
+
+      // Export washer if enabled
+      if (params.hasWasher) {
+        console.log('--- Exporting Washer', boltIndex, '---');
+        const washer = createSingleWasher(params);
+        const washerSTL = exporter.parse(washer, { binary: true }) as DataView;
+        console.log('Washer STL size:', washerSTL.byteLength, 'bytes');
+        files[`washer_${boltIndex}.stl`] = new Uint8Array(washerSTL.buffer);
+      }
+    }
+
+    // Create ZIP archive with separate STL files
+    const zipped = fflate.zipSync(files, { level: 6 });
+    const blob = new Blob([zipped], { type: 'application/zip' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `bolt_kit_${params.quantity}x.zip`;
+    link.click();
+    URL.revokeObjectURL(url);
+  } catch (error) {
+    console.error('STL Export Error:', error);
+    alert('Export failed! Check console for details.');
+  }
 };
 
 export const download3MF = async (params: BoltParams) => {
