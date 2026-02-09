@@ -216,7 +216,11 @@ const createSingleNut = (params: BoltParams): THREE.Group => {
   const group = new THREE.Group();
   const material = new THREE.MeshStandardMaterial({ color: 0x94a3b8 });
 
-  const innerRadius = (params.d / 2) + 0.4;
+  // Inner hole should fit bolt with proper clearance
+  // Bolt thread radius = d/2 - threadDepth/2
+  // Nut should have ~0.15mm clearance for smooth assembly
+  const clearance = 0.15;
+  const innerRadius = (params.d / 2) + clearance;
   const outerRadius = params.headS / 2;
 
   // Hexagonal body - FIX: properly initialize shape with moveTo
